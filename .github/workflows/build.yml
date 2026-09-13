@@ -2,8 +2,9 @@ name: Build
 
 # E release pipeline (spec §65–§69).
 #
-#   Pull request -> format check + analyze + unit/widget tests.
-#                   Builds run too (artifacts only, never released).
+#   Push to main/master -> format + analyze + tests + all platform
+#                   builds (artifacts only, never released).
+#   Pull request -> same as push (artifacts only, never released).
 #   Tag v* (v1.0.0) -> everything above, then release builds whose
 #                   artifacts are published to the GitHub Release:
 #                     E-<version>-android.apk
@@ -17,13 +18,15 @@ name: Build
 # every artifact exists before publishing. A broken build can never
 # become a Release.
 #
-# Versioning (spec §69): the single source of truth is APP_VERSION
-# below, kept in sync with AppInfo.version in
-# lib/core/constants/app_info.dart and pubspec.yaml.
+# Versioning (spec §69): APP_VERSION below is the single source of
+# truth, kept in sync with AppInfo.version in
+# lib/core/constants/app_info.dart and pubspec.yaml. The check job
+# fails fast when the three drift apart.
 
 on:
   pull_request:
   push:
+    branches: [main, master]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -54,6 +57,17 @@ jobs:
           cache: true
 
       - run: flutter pub get
+
+      - name: Version sync check (workflow <-> AppInfo <-> pubspec)
+        run: |
+          APP_INFO=$(grep -oP "version\s*=\s*'\K[^']+" lib/core/constants/app_info.dart)
+          PUBSPEC=$(grep -oP '^version:\s*\K[0-9]+\.[0-9]+\.[0-9]+' pubspec.yaml)
+          echo "workflow=${{ env.APP_VERSION }} app_info=$APP_INFO pubspec=$PUBSPEC"
+          test "$APP_INFO" = "${{ env.APP_VERSION }}" || \
+            (echo "::error::AppInfo.version ($APP_INFO) != APP_VERSION (${{ env.APP_VERSION }})" && exit 1)
+          test "$PUBSPEC" = "${{ env.APP_VERSION }}" || \
+            (echo "::error::pubspec version ($PUBSPEC) != APP_VERSION (${{ env.APP_VERSION }})" && exit 1)
+
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
