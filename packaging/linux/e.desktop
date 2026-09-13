@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=E
+Comment=E — offline language learning. Your language, your lessons, your pace.
+Exec=/usr/bin/e
+Terminal=false
+Type=Application
+Categories=Education;Languages;
+StartupWMClass=e
+Keywords=language;learning;flashcards;
