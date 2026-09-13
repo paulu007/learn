@@ -53,9 +53,8 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not read file: $e')));
       }
     }
   }
@@ -92,9 +91,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
 
   List<List<String>> _excelServiceGrid(List<int> bytes) {
     // Reuse the shared reader (kept separate for testability).
-    return ExcelImportService().readSheet(
-      Uint8List.fromList(bytes),
-    );
+    return ExcelImportService().readSheet(Uint8List.fromList(bytes));
   }
 
   Future<void> _doImport() async {
@@ -116,11 +113,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
       var order = 0;
       final lessonIds = <String, String>{};
       for (final name in preview.lessons) {
-        final lesson = await repo.findOrCreateLesson(
-          course.id,
-          name,
-          order++,
-        );
+        final lesson = await repo.findOrCreateLesson(course.id, name, order++);
         lessonIds[name] = lesson.id;
       }
       final grouped = _csvService.groupByLesson(
@@ -161,9 +154,8 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
               children: [
                 Text(
                   'Course languages',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -196,18 +188,15 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
               children: [
                 Text(
                   'How should your CSV look?',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerLow,
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const SelectableText(
@@ -262,9 +251,8 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
         children: [
           Text(
             'Import Preview${_fileName == null ? '' : ' — $_fileName'}',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           if (preview.globalErrors.isNotEmpty)

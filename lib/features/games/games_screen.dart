@@ -32,9 +32,8 @@ class _GamesScreenState extends ConsumerState<GamesScreen> {
             children: [
               Text(
                 'Play with:',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               _LessonPicker(
@@ -116,8 +115,11 @@ class _GamesScreenState extends ConsumerState<GamesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
                 Text(subtitle),
               ],
             ),
@@ -157,9 +159,8 @@ class _GamesScreenState extends ConsumerState<GamesScreen> {
       return;
     }
     if (context.mounted) {
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => build(items)));
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => build(items)));
     }
   }
 }
@@ -219,17 +220,15 @@ class _BestScores extends ConsumerWidget {
         children: [
           Text(
             'Best Scores',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           for (final game in ['timed', 'matching', 'quick'])
             FutureBuilder(
               future: ref.read(repositoryProvider).bestScore(game),
-              builder: (ctx, snap) => Text(
-                '${_gameName(game)}: ${snap.data ?? 0}%',
-              ),
+              builder: (ctx, snap) =>
+                  Text('${_gameName(game)}: ${snap.data ?? 0}%'),
             ),
         ],
       ),
@@ -347,8 +346,7 @@ class TimedFlashcardsScreen extends ConsumerStatefulWidget {
       _TimedFlashcardsScreenState();
 }
 
-class _TimedFlashcardsScreenState
-    extends ConsumerState<TimedFlashcardsScreen> {
+class _TimedFlashcardsScreenState extends ConsumerState<TimedFlashcardsScreen> {
   late List<LearningItem> _items;
   int _index = 0;
   int _correct = 0;
@@ -425,7 +423,9 @@ class _TimedFlashcardsScreenState
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _revealed ? item.targetText : 'Tap I Know / Again after recalling',
+                  _revealed
+                      ? item.targetText
+                      : 'Tap I Know / Again after recalling',
                   style: Theme.of(context).textTheme.titleMedium,
                   textAlign: TextAlign.center,
                 ),
@@ -478,8 +478,7 @@ class WordMatchingScreen extends ConsumerStatefulWidget {
   const WordMatchingScreen({super.key, required this.items, this.lessonId});
 
   @override
-  ConsumerState<WordMatchingScreen> createState() =>
-      _WordMatchingScreenState();
+  ConsumerState<WordMatchingScreen> createState() => _WordMatchingScreenState();
 }
 
 class _WordMatchingScreenState extends ConsumerState<WordMatchingScreen> {
@@ -536,17 +535,12 @@ class _WordMatchingScreenState extends ConsumerState<WordMatchingScreen> {
                 child: OutlinedButton(
                   style: _matched.contains(item.id)
                       ? OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: Colors.green,
-                            width: 2,
-                          ),
+                          side: const BorderSide(color: Colors.green, width: 2),
                         )
                       : _pickedSource == item.id
                       ? OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary,
+                            color: Theme.of(context).colorScheme.primary,
                             width: 2,
                           ),
                         )
@@ -567,10 +561,7 @@ class _WordMatchingScreenState extends ConsumerState<WordMatchingScreen> {
                 child: OutlinedButton(
                   style: _matched.contains(item.id)
                       ? OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: Colors.green,
-                            width: 2,
-                          ),
+                          side: const BorderSide(color: Colors.green, width: 2),
                         )
                       : null,
                   onPressed: _matched.contains(item.id) || _pickedSource == null
@@ -631,12 +622,13 @@ class _QuickAnswerScreenState extends ConsumerState<QuickAnswerScreen> {
   }
 
   List<String> _choices(LearningItem item) {
-    final others = widget.items
-        .where((e) => e.id != item.id)
-        .map((e) => e.targetText)
-        .toSet()
-        .toList()
-      ..shuffle();
+    final others =
+        widget.items
+            .where((e) => e.id != item.id)
+            .map((e) => e.targetText)
+            .toSet()
+            .toList()
+          ..shuffle();
     return [...others.take(3), item.targetText]..shuffle();
   }
 
@@ -672,9 +664,8 @@ class _QuickAnswerScreenState extends ConsumerState<QuickAnswerScreen> {
           SectionCard(
             child: Text(
               'What is: ${item.sourceText}',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           if (_picked != null)
@@ -702,8 +693,7 @@ class _QuickAnswerScreenState extends ConsumerState<QuickAnswerScreen> {
                 ),
               ),
             ),
-          if (_picked != null)
-            PrimaryButton(label: 'Next', onPressed: _next),
+          if (_picked != null) PrimaryButton(label: 'Next', onPressed: _next),
         ],
       ),
     );

@@ -98,18 +98,14 @@ class CsvImportService {
     try {
       grid = Csv().decode(text);
     } catch (e) {
-      return ImportPreview(
-        globalErrors: ['Could not parse the CSV file: $e'],
-      );
+      return ImportPreview(globalErrors: ['Could not parse the CSV file: $e']);
     }
     // Drop fully-empty rows.
     final lines = grid
         .where((r) => r.any((c) => c.toString().trim().isNotEmpty))
         .toList();
     if (lines.isEmpty) {
-      return const ImportPreview(
-        globalErrors: ['The file is empty.'],
-      );
+      return const ImportPreview(globalErrors: ['The file is empty.']);
     }
     return _validate(lines, startLine: 1);
   }
@@ -122,9 +118,7 @@ class CsvImportService {
         .map((r) => r.map((c) => c as dynamic).toList())
         .toList();
     if (lines.isEmpty) {
-      return const ImportPreview(
-        globalErrors: ['The sheet is empty.'],
-      );
+      return const ImportPreview(globalErrors: ['The sheet is empty.']);
     }
     return _validate(lines, startLine: 1);
   }
@@ -212,21 +206,23 @@ class CsvImportService {
       final lessonName = r.lesson.isEmpty ? 'Lesson 1' : r.lesson;
       final lessonId = lessonIds[lessonName];
       if (lessonId == null) continue;
-      grouped.putIfAbsent(lessonName, () => []).add(
-        LearningItem(
-          id: newId(),
-          courseId: courseId,
-          lessonId: lessonId,
-          type: r.type,
-          sourceText: r.source,
-          targetText: r.target,
-          example: r.example,
-          hint: r.hint,
-          tags: r.tags,
-          difficulty: r.difficulty,
-          createdAt: nowMs(),
-        ),
-      );
+      grouped
+          .putIfAbsent(lessonName, () => [])
+          .add(
+            LearningItem(
+              id: newId(),
+              courseId: courseId,
+              lessonId: lessonId,
+              type: r.type,
+              sourceText: r.source,
+              targetText: r.target,
+              example: r.example,
+              hint: r.hint,
+              tags: r.tags,
+              difficulty: r.difficulty,
+              createdAt: nowMs(),
+            ),
+          );
     }
     return grouped;
   }

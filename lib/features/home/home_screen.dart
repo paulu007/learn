@@ -2,170 +2,282 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app_providers.dart';
-import '../../core/constants/app_constants.dart';
+import '../../core/design/e_design.dart';
 import '../../core/utils/app_utils.dart';
 import '../../data/models/models.dart';
 import '../../widgets/common_widgets.dart';
-import '../courses/courses_screen.dart';
+import '../courses/lesson_detail_screen.dart';
+import '../games/games_screen.dart';
 import '../import_data/import_screen.dart';
+import '../learn/learn_screen.dart';
 import '../learning/lesson_session_screen.dart';
+import '../practice/practice_screen.dart';
 
-/// Home: streak, today's goal/progress, current course + lesson,
-/// continue learning, recently studied, shortcuts.
+/// Home (spec §8, §58, §59): answers "What should I do now?"
+/// Greeting → streak → daily goal → continue → review → quick actions.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    final activity = ref.watch(todayActivityProvider);
-    final streak = ref.watch(streakProvider);
-    final courses = ref.watch(coursesProvider);
-
-    return settings.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EmptyState(
-        icon: Icons.error_outline,
-        title: 'Something went wrong',
-        message: e.toString(),
-      ),
-      data: (s) => RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(coursesProvider);
-          ref.invalidate(todayActivityProvider);
-          ref.invalidate(streakProvider);
-        },
+    return EAsyncView<UserSettings>(
+      value: settings,
+      builder: (s) => RefreshIndicator(
+        onRefresh: () async => refreshAfterStudy(ref),
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 12),
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-              child: Text(
-                dayGreeting(),
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            _streakCard(context, streak, s.dailyGoal),
-            _todayCard(context, s.dailyGoal, activity),
-            _continueCard(context, ref, courses, s),
-            _shortcutsRow(context),
+            _greeting(context, ref),
+            _continueHero(context, ref, s),
+            _reviewHero(context, ref),
+            _todayRow(context, ref, s.dailyGoal),
+            _quickActions(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _streakCard(
-    BuildContext context,
-    AsyncValue<StreakInfo> streak,
-    int goal,
-  ) {
-    return SectionCard(
+  Widget _greeting(BuildContext context, WidgetRef ref) {
+    final streak = ref.watch(streakProvider);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
       child: Row(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.local_fire_department,
-              color: Colors.orange,
-              size: 32,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${dayGreeting()} 👋',
+                  style: Theme.of(context).textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'What should you do now? Start below.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: streak.when(
-              loading: () => const Text('Loading streak…'),
-              error: (_, _) => const Text('Streak unavailable'),
-              data: (st) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${st.current} Day Streak',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'Longest: ${st.longest} days · Goal: $goal activities/day',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
+          streak.maybeWhen(
+            data: (st) => EStreakPill(days: st.current),
+            orElse: () => const SizedBox.shrink(),
           ),
         ],
       ),
     );
   }
 
-  Widget _todayCard(
-    BuildContext context,
-    int goal,
-    AsyncValue<DailyActivity> activity,
-  ) {
+  /// Smart Continue (spec §58): review due first, else current lesson.
+  Widget _continueHero(BuildContext context, WidgetRef ref, UserSettings s) {
+    final due = ref.watch(dueCountProvider);
+    final courses = ref.watch(coursesProvider);
+    return due.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (dueCount) {
+        if (dueCount > 0) {
+          return EHeroCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Continue Learning',
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Review $dueCount word${dueCount == 1 ? '' : 's'} · ~5 minutes',
+                  style: Theme.of(context).textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 12),
+                EPrimaryButton(
+                  label: 'Start',
+                  icon: Icons.play_arrow,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PracticeScreen()),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return courses.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
+          data: (all) {
+            if (all.isEmpty) {
+              return EHeroCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome to E!',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Import your first lesson to start learning. Your language, your lessons, your pace.',
+                    ),
+                    const SizedBox(height: 12),
+                    EPrimaryButton(
+                      label: 'Import Lesson',
+                      icon: Icons.upload_file,
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ImportScreen()),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return FutureBuilder(
+              future: _currentLesson(ref, all, s),
+              builder: (ctx, snap) {
+                if (!snap.hasData) return const SizedBox.shrink();
+                final info = snap.data!;
+                if (info.lessonId.isEmpty) return const SizedBox.shrink();
+                return EHeroCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          LessonDetailScreen(lessonId: info.lessonId),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Continue Learning',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        info.courseTitle,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        '${info.lessonTitle} · ${info.words} words · ${info.sentences} sentences',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      EPrimaryButton(
+                        label: 'Continue',
+                        icon: Icons.play_arrow,
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                LessonSessionScreen(lessonId: info.lessonId),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Daily review nudge (spec §35) — hidden when the Continue hero already
+  /// covers review, shown when there is a current lesson AND due items.
+  Widget _reviewHero(BuildContext context, WidgetRef ref) {
+    final due = ref.watch(dueCountProvider);
+    return due.maybeWhen(
+      data: (count) {
+        if (count == 0) return const SizedBox.shrink();
+        return ESectionCard(
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: EColors.xp.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(ERadii.lg),
+                ),
+                child: const Icon(Icons.history, color: EColors.xp, size: 26),
+              ),
+              const SizedBox(width: ESpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$count ready for review',
+                      style: Theme.of(context).textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      "Let's make them stronger.",
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PracticeScreen()),
+                ),
+                child: const Text('Review'),
+              ),
+            ],
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _todayRow(BuildContext context, WidgetRef ref, int goal) {
+    final activity = ref.watch(todayActivityProvider);
     return activity.when(
-      loading: () => const SectionCard(child: LinearProgressIndicator()),
+      loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
       data: (act) {
         final done = act.activities.clamp(0, goal);
-        final doneGoal = act.goalCompleted;
-        return SectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        return ESectionCard(
+          onTap: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const PracticeScreen())),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      "Today's Progress",
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  if (doneGoal)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppConstants.correctGreen.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Completed',
-                        style: TextStyle(
-                          color: AppConstants.correctGreen,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              LabeledProgress(
+              EProgressRing(
                 value: goal == 0 ? 0 : done / goal,
-                label: '$done / $goal activities',
+                done: done,
+                goal: goal,
               ),
-              if (doneGoal)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Daily Goal Complete! Streak updated.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppConstants.correctGreen,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: ESpacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Today's goal",
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
-                  ),
+                    Text(
+                      act.goalCompleted
+                          ? 'Completed ✓ — streak updated.'
+                          : '$done of $goal activities done.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
         );
@@ -173,104 +285,42 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _continueCard(
-    BuildContext context,
-    WidgetRef ref,
-    AsyncValue<List<Course>> courses,
-    UserSettings s,
-  ) {
-    return courses.when(
-      loading: () => const SectionCard(child: LinearProgressIndicator()),
-      error: (_, _) => const SizedBox.shrink(),
-      data: (all) {
-        if (all.isEmpty) {
-          return SectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome to E!',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Import your first lesson from a CSV or Excel file to start learning. Your language, your lessons, your pace.',
-                ),
-                const SizedBox(height: 12),
-                PrimaryButton(
-                  label: 'Import Lesson',
-                  icon: Icons.upload_file,
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ImportScreen(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-        return FutureBuilder(
-          future: _currentLesson(ref, all, s),
-          builder: (ctx, snap) {
-            if (!snap.hasData) {
-              return const SectionCard(
-                child: LinearProgressIndicator(),
-              );
-            }
-            final info = snap.data!;
-            return SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Current Course:',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  Text(
-                    info.courseTitle,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Current Lesson: ${info.lessonTitle}',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  Text(
-                    'Words: ${info.words} · Sentences: ${info.sentences}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  if (info.recent != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Recently studied: ${info.recent}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  PrimaryButton(
-                    label: 'Continue Learning',
-                    icon: Icons.play_arrow,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LessonSessionScreen(
-                            lessonId: info.lessonId,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+  Widget _quickActions(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+          child: Text(
+            'Quick actions',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+        ETile(
+          icon: Icons.school_outlined,
+          title: 'Learn',
+          subtitle: 'Courses and lessons',
+          onTap: () =>
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const LearnScreen())),
+        ),
+        ETile(
+          icon: Icons.sports_esports_outlined,
+          title: 'Games',
+          subtitle: 'Flash challenge, match, quick answer',
+          onTap: () =>
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const GamesScreen())),
+        ),
+        ETile(
+          icon: Icons.upload_file_outlined,
+          title: 'Import',
+          subtitle: 'CSV or Excel lessons',
+          onTap: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const ImportScreen())),
+        ),
+      ],
     );
   }
 
@@ -281,11 +331,9 @@ class HomeScreen extends ConsumerWidget {
   ) async {
     final repo = ref.read(repositoryProvider);
     var course = all.first;
-    final lastCourseId = s.lastCourseId;
-    final lastLessonId = s.lastLessonId;
-    if (lastCourseId != null) {
+    if (s.lastCourseId != null) {
       for (final c in all) {
-        if (c.id == lastCourseId) course = c;
+        if (c.id == s.lastCourseId) course = c;
       }
     }
     final lessons = await repo.lessonsOf(course.id);
@@ -296,13 +344,12 @@ class HomeScreen extends ConsumerWidget {
         lessonId: '',
         words: 0,
         sentences: 0,
-        recent: null,
       );
     }
     var lesson = lessons.first;
-    if (lastLessonId != null) {
+    if (s.lastLessonId != null) {
       for (final l in lessons) {
-        if (l.id == lastLessonId) lesson = l;
+        if (l.id == s.lastLessonId) lesson = l;
       }
     } else if (course.currentLessonId != null) {
       for (final l in lessons) {
@@ -310,83 +357,12 @@ class HomeScreen extends ConsumerWidget {
       }
     }
     final counts = await repo.itemCountsByType(lesson.id);
-    final recentLesson = lastLessonId == null
-        ? null
-        : await repo.lessonById(lastLessonId);
     return _CurrentInfo(
       courseTitle: course.title,
       lessonTitle: lesson.title,
       lessonId: lesson.id,
       words: counts['vocab'] ?? 0,
-      sentences:
-          (counts['sentence'] ?? 0) + (counts['communication'] ?? 0),
-      recent: recentLesson?.title,
-    );
-  }
-
-  Widget _shortcutsRow(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: _Shortcut(
-              icon: Icons.school_outlined,
-              label: 'Courses',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const CoursesScreen(),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _Shortcut(
-              icon: Icons.upload_file_outlined,
-              label: 'Import',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ImportScreen(),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Shortcut extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _Shortcut({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            children: [
-              Icon(icon, size: 28),
-              const SizedBox(height: 4),
-              Text(label),
-            ],
-          ),
-        ),
-      ),
+      sentences: (counts['sentence'] ?? 0) + (counts['communication'] ?? 0),
     );
   }
 }
@@ -397,7 +373,6 @@ class _CurrentInfo {
   final String lessonId;
   final int words;
   final int sentences;
-  final String? recent;
 
   _CurrentInfo({
     required this.courseTitle,
@@ -405,6 +380,5 @@ class _CurrentInfo {
     required this.lessonId,
     required this.words,
     required this.sentences,
-    required this.recent,
   });
 }

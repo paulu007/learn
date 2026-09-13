@@ -4,63 +4,60 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app_providers.dart';
 import '../../data/models/models.dart';
 import '../../widgets/common_widgets.dart';
+import '../courses/lesson_detail_screen.dart';
 import '../import_data/import_screen.dart';
-import 'lesson_detail_screen.dart';
+import '../learning/lesson_session_screen.dart';
 
-/// Lists all courses with full user control: create, rename, delete,
-/// and navigation into lessons.
-class CoursesScreen extends ConsumerWidget {
-  const CoursesScreen({super.key});
+/// Learn tab (spec §7, §9, §37): courses → lessons → Start/Continue.
+/// Short game-like sessions; users study in their own order.
+class LearnScreen extends ConsumerWidget {
+  const LearnScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final courses = ref.watch(coursesProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Courses'),
-        actions: [
-          IconButton(
-            tooltip: 'Import lessons',
-            icon: const Icon(Icons.upload_file_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ImportScreen()),
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _createCourseDialog(context, ref),
-        icon: const Icon(Icons.add),
-        label: const Text('New Course'),
-      ),
-      body: AsyncView<List<Course>>(
-        value: courses,
-        builder: (list) {
-          if (list.isEmpty) {
-            return EmptyState(
-              icon: Icons.school_outlined,
-              title: 'No courses yet',
-              message:
-                  'Create a course for any language pair, or import lessons from a CSV or Excel file.',
-              actionLabel: 'Import Lesson',
-              onAction: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ImportScreen()),
-              ),
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: list.length,
-            itemBuilder: (ctx, i) => _courseCard(ctx, ref, list[i]),
+    return EAsyncView<List<Course>>(
+      value: courses,
+      builder: (list) {
+        if (list.isEmpty) {
+          return EEmptyState(
+            icon: Icons.school_outlined,
+            title: 'No courses yet',
+            message: 'Create a course for any language pair, or import lessons from a CSV or Excel file.',
+            primaryLabel: 'Import Lesson',
+            onPrimary: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const ImportScreen())),
+            secondaryLabel: 'New Course',
+            onSecondary: () => _createCourseDialog(context, ref),
           );
-        },
-      ),
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(coursesProvider),
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            itemCount: list.length + 1,
+            itemBuilder: (ctx, i) {
+              if (i == list.length) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ESecondaryButton(
+                    label: 'New Course',
+                    icon: Icons.add,
+                    onPressed: () => _createCourseDialog(context, ref),
+                  ),
+                );
+              }
+              return _courseCard(ctx, ref, list[i]);
+            },
+          ),
+        );
+      },
     );
   }
 
   Widget _courseCard(BuildContext context, WidgetRef ref, Course course) {
     final lessons = ref.watch(lessonsProvider(course.id));
-    return SectionCard(
+    return ESectionCard(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => CourseDetailScreen(courseId: course.id),
@@ -74,9 +71,8 @@ class CoursesScreen extends ConsumerWidget {
               Expanded(
                 child: Text(
                   course.title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
               PopupMenuButton<String>(
@@ -88,14 +84,8 @@ class CoursesScreen extends ConsumerWidget {
                   }
                 },
                 itemBuilder: (_) => const [
-                  PopupMenuItem(
-                    value: 'rename',
-                    child: Text('Rename'),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete'),
-                  ),
+                  PopupMenuItem(value: 'rename', child: Text('Rename')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete')),
                 ],
               ),
             ],
@@ -105,7 +95,9 @@ class CoursesScreen extends ConsumerWidget {
             error: (_, _) => const SizedBox.shrink(),
             data: (ls) => Text(
               '${ls.length} lesson${ls.length == 1 ? '' : 's'}',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
@@ -152,10 +144,10 @@ class CoursesScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (ok == true && source.text.trim().isNotEmpty && target.text.trim().isNotEmpty) {
-      await ref
-          .read(repositoryProvider)
-          .createCourse(source.text, target.text);
+    if (ok == true &&
+        source.text.trim().isNotEmpty &&
+        target.text.trim().isNotEmpty) {
+      await ref.read(repositoryProvider).createCourse(source.text, target.text);
       ref.invalidate(coursesProvider);
     }
   }
@@ -227,7 +219,7 @@ class CoursesScreen extends ConsumerWidget {
   }
 }
 
-/// Lessons inside one course with full lesson controls.
+/// Lessons inside one course with full lesson controls (spec §38).
 class CourseDetailScreen extends ConsumerWidget {
   final String courseId;
   const CourseDetailScreen({super.key, required this.courseId});
@@ -238,10 +230,12 @@ class CourseDetailScreen extends ConsumerWidget {
     final lessons = ref.watch(lessonsProvider(courseId));
     return Scaffold(
       appBar: AppBar(
-        title: Text(course.maybeWhen(
-          data: (c) => c?.title ?? 'Course',
-          orElse: () => 'Course',
-        )),
+        title: Text(
+          course.maybeWhen(
+            data: (c) => c?.title ?? 'Course',
+            orElse: () => 'Course',
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _createLessonDialog(context, ref),
@@ -252,11 +246,10 @@ class CourseDetailScreen extends ConsumerWidget {
         value: lessons,
         builder: (list) {
           if (list.isEmpty) {
-            return const EmptyState(
+            return const EEmptyState(
               icon: Icons.book_outlined,
               title: 'No lessons yet',
-              message:
-                  'Add a lesson manually or import lessons from a CSV or Excel file.',
+              message: 'Add a lesson manually or import lessons from a CSV or Excel file.',
             );
           }
           return ReorderableListView.builder(
@@ -286,6 +279,9 @@ class CourseDetailScreen extends ConsumerWidget {
   }) {
     final counts = ref.watch(typeCountsProvider(lesson.id));
     final status = ref.watch(statusCountsProvider(lesson.id));
+    final due = ref
+        .watch(dueCountsByLessonProvider)
+        .maybeWhen(data: (m) => m[lesson.id] ?? 0, orElse: () => 0);
     return Card(
       key: key,
       child: ListTile(
@@ -298,16 +294,20 @@ class CourseDetailScreen extends ConsumerWidget {
           loading: () => const Text('…'),
           error: (_, _) => const SizedBox.shrink(),
           data: (c) {
-            final total = (c['vocab'] ?? 0) +
+            final total =
+                (c['vocab'] ?? 0) +
                 (c['sentence'] ?? 0) +
                 (c['communication'] ?? 0);
             final mastered = status.maybeWhen(
               data: (s) => s['mastered'] ?? 0,
               orElse: () => 0,
             );
-            return Text(
-              '$total items · $mastered mastered',
-            );
+            final parts = [
+              '$total items',
+              '$mastered mastered',
+              if (due > 0) '$due due',
+            ];
+            return Text(parts.join(' · '));
           },
         ),
         trailing: PopupMenuButton<String>(
@@ -423,9 +423,8 @@ class CourseDetailScreen extends ConsumerWidget {
       ref.invalidate(statusCountsProvider(lesson.id));
       refreshAfterStudy(ref);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Progress reset.')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Progress reset.')));
       }
     }
   }
@@ -475,9 +474,20 @@ class CourseDetailScreen extends ConsumerWidget {
   ) async {
     final path = await ref.read(repositoryProvider).exportLesson(lesson.id);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lesson exported to $path')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Lesson exported to $path')));
     }
+  }
+}
+
+/// Thin wrapper so a lesson can also launch directly from review queues:
+/// opens the mixed session for [lessonId].
+class LearnLessonLauncher {
+  static void open(BuildContext context, String lessonId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LessonSessionScreen(lessonId: lessonId),
+      ),
+    );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app_providers.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/app_info.dart';
 import '../../data/models/models.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -27,6 +28,7 @@ class SettingsScreen extends ConsumerWidget {
             _keyboardCard(context),
             _dataCard(context, ref),
             _dangerCard(context, ref),
+            _aboutCard(context),
           ],
         ),
       ),
@@ -38,12 +40,14 @@ class SettingsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Appearance', style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            'Appearance',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
           RadioGroup<String>(
             groupValue: s.themeMode,
-            onChanged: (v) =>
-                ref.read(settingsProvider.notifier).setTheme(v!),
+            onChanged: (v) => ref.read(settingsProvider.notifier).setTheme(v!),
             child: Column(
               children: [
                 for (final mode in ['light', 'dark', 'system'])
@@ -64,8 +68,11 @@ class SettingsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Font Size', style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            'Font Size',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
           RadioGroup<String>(
             groupValue: s.fontSize,
             onChanged: (v) => ref
@@ -97,8 +104,11 @@ class SettingsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Learning', style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            'Learning',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -146,8 +156,11 @@ class SettingsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Keyboard', style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            'Keyboard',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 4),
           const Text(
             'E always uses its own in-app keyboard — the system keyboard never opens. '
@@ -164,17 +177,18 @@ class SettingsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Data', style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            'Data',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 8),
           _dataButton(
             context,
             'Backup Everything',
             Icons.backup_outlined,
             () async {
-              final path = await ref
-                  .read(repositoryProvider)
-                  .writeBackup();
+              final path = await ref.read(repositoryProvider).writeBackup();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Backup saved to $path')),
@@ -193,9 +207,7 @@ class SettingsScreen extends ConsumerWidget {
             'Export Progress (JSON)…',
             Icons.download_outlined,
             () async {
-              final path = await ref
-                  .read(repositoryProvider)
-                  .writeBackup();
+              final path = await ref.read(repositoryProvider).writeBackup();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Data exported to $path')),
@@ -243,9 +255,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             TextField(
               controller: pathCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Backup file path',
-              ),
+              decoration: const InputDecoration(labelText: 'Backup file path'),
             ),
           ],
         ),
@@ -270,14 +280,17 @@ class SettingsScreen extends ConsumerWidget {
         refreshAfterStudy(ref);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Restored: ${counts.values.fold(0, (a, b) => a + b)} rows.')),
+            SnackBar(
+              content: Text(
+                'Restored: ${counts.values.fold(0, (a, b) => a + b)} rows.',
+              ),
+            ),
           );
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Restore failed: $e')),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Restore failed: $e')));
         }
       }
     }
@@ -303,8 +316,7 @@ class SettingsScreen extends ConsumerWidget {
                 final ok = await confirmAction(
                   context,
                   title: 'Reset all progress?',
-                  message:
-                      'Remove ALL learning progress but keep your courses and lessons? This action cannot be undone.',
+                  message: 'Remove ALL learning progress but keep your courses and lessons? This action cannot be undone.',
                   confirmLabel: 'Reset Progress',
                   danger: false,
                 );
@@ -327,8 +339,7 @@ class SettingsScreen extends ConsumerWidget {
                 final ok = await confirmAction(
                   context,
                   title: 'Clear all lessons?',
-                  message:
-                      'Delete ALL courses, lessons, items, and progress? This action cannot be undone.',
+                  message: 'Delete ALL courses, lessons, items, and progress? This action cannot be undone.',
                   confirmLabel: 'Clear All Lessons',
                 );
                 if (ok) {
@@ -340,6 +351,29 @@ class SettingsScreen extends ConsumerWidget {
               child: const Text('Clear All Lessons'),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// App identity + semantic version (spec §69).
+  Widget _aboutCard(BuildContext context) {
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'About',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${AppInfo.name} ${AppInfo.version}',
+            style: Theme.of(context).textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          Text(AppInfo.tagline, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

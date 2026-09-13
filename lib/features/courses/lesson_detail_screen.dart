@@ -18,27 +18,26 @@ class LessonDetailScreen extends ConsumerWidget {
     final counts = ref.watch(typeCountsProvider(lessonId));
     final status = ref.watch(statusCountsProvider(lessonId));
     final AsyncValue<Map<String, ItemProgress>> progressMap = items.when(
-      data: (list) => ref.watch(
-        _progressMapProvider(list.map((e) => e.id).toList()),
-      ),
+      data: (list) =>
+          ref.watch(_progressMapProvider(list.map((e) => e.id).toList())),
       loading: () => const AsyncValue<Map<String, ItemProgress>>.loading(),
       error: (e, s) => AsyncValue<Map<String, ItemProgress>>.error(e, s),
     );
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(lesson.maybeWhen(
-          data: (l) => l?.title ?? 'Lesson',
-          orElse: () => 'Lesson',
-        )),
+        title: Text(
+          lesson.maybeWhen(
+            data: (l) => l?.title ?? 'Lesson',
+            orElse: () => 'Lesson',
+          ),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
           counts.when(
-            loading: () => const SectionCard(
-              child: LinearProgressIndicator(),
-            ),
+            loading: () => const SectionCard(child: LinearProgressIndicator()),
             error: (_, _) => const SizedBox.shrink(),
             data: (c) {
               final words = c['vocab'] ?? 0;
@@ -76,21 +75,20 @@ class LessonDetailScreen extends ConsumerWidget {
                               lesson.value?.courseId ?? '',
                               lessonId,
                             );
-                        final settings =
-                            await ref.read(settingsProvider.future);
+                        final settings = await ref.read(
+                          settingsProvider.future,
+                        );
                         await ref
                             .read(settingsProvider.notifier)
                             .setLastLesson(
-                              settings.lastCourseId ??
-                                  lesson.value?.courseId,
+                              settings.lastCourseId ?? lesson.value?.courseId,
                               lessonId,
                             );
                         if (context.mounted) {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => LessonSessionScreen(
-                                lessonId: lessonId,
-                              ),
+                              builder: (_) =>
+                                  LessonSessionScreen(lessonId: lessonId),
                             ),
                           );
                         }

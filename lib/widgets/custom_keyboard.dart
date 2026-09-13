@@ -61,11 +61,7 @@ class CustomKeyboard extends StatelessWidget {
               children: [
                 Expanded(
                   flex: 3,
-                  child: _Key(
-                    label: 'SPACE',
-                    onTap: onSpace,
-                    wide: true,
-                  ),
+                  child: _Key(label: 'SPACE', onTap: onSpace, wide: true),
                 ),
                 Expanded(
                   child: _Key(
@@ -102,12 +98,7 @@ class _Key extends StatelessWidget {
   final VoidCallback onTap;
   final bool wide;
 
-  const _Key({
-    this.label,
-    this.icon,
-    required this.onTap,
-    this.wide = false,
-  });
+  const _Key({this.label, this.icon, required this.onTap, this.wide = false});
 
   @override
   Widget build(BuildContext context) {

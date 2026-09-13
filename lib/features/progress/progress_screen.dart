@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app_providers.dart';
+import '../../core/design/e_design.dart';
+import '../../core/utils/app_utils.dart';
 import '../../data/models/models.dart';
 import '../../widgets/common_widgets.dart';
+import '../calendar_stats/calendar_stats_screen.dart';
 
-/// Progress: per-type bars, totals, streaks, accuracy, weak words.
+/// Progress tab (spec §32): streak hero, learning-progress bars, stats,
+/// weak words — with links into Calendar & Statistics (kept separate so
+/// Progress stays glanceable, spec §4).
 class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
 
@@ -14,22 +19,58 @@ class ProgressScreen extends ConsumerWidget {
     final totals = ref.watch(totalsProvider);
     final streak = ref.watch(streakProvider);
     return RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(totalsProvider);
-        ref.invalidate(streakProvider);
-      },
+      onRefresh: () async => refreshAfterStudy(ref),
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
-          AsyncView<Map<String, int>>(
+          EAsyncView<StreakInfo>(
+            value: streak,
+            builder: (s) => _streakHero(context, s),
+          ),
+          EAsyncView<Map<String, int>>(
             value: totals,
             builder: (t) => _overviewCard(context, ref, t),
           ),
-          AsyncView<StreakInfo>(
-            value: streak,
-            builder: (s) => _streakCard(context, s),
-          ),
+          _calendarStatsLinks(context),
           _weakWordsCard(context, ref),
+        ],
+      ),
+    );
+  }
+
+  Widget _streakHero(BuildContext context, StreakInfo s) {
+    return EHeroCard(
+      gradient: [
+        EColors.streak.withValues(alpha: 0.85),
+        const Color(0xFFEA580C),
+      ],
+      child: Row(
+        children: [
+          const Icon(
+            Icons.local_fire_department,
+            color: Colors.white,
+            size: 48,
+          ),
+          const SizedBox(width: ESpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${s.current} day streak',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  'Longest: ${s.longest} days',
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: Colors.white.withValues(alpha: 0.9)),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -48,17 +89,12 @@ class ProgressScreen extends ConsumerWidget {
     final wrong = t['wrong'] ?? 0;
     final attempts = correct + wrong;
     final accuracy = attempts == 0 ? 0 : ((correct / attempts) * 100).round();
-    return SectionCard(
+    return ESectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Learning Progress',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
+          const ESectionTitle(title: 'Learning Progress'),
+          const SizedBox(height: ESpacing.sm),
           FutureBuilder(
             future: ref.read(repositoryProvider).overallStatusCounts(),
             builder: (ctx, snap) {
@@ -70,17 +106,17 @@ class ProgressScreen extends ConsumerWidget {
 
               return Column(
                 children: [
-                  LabeledProgress(
+                  ELabeledProgress(
                     value: items == 0 ? 0 : mastered / items,
                     label: 'Overall mastered',
                   ),
                   const SizedBox(height: 8),
-                  LabeledProgress(
+                  ELabeledProgress(
                     value: frac('mastered', vocab == 0 ? 1 : vocab),
                     label: 'Vocabulary ($vocab)',
                   ),
                   const SizedBox(height: 8),
-                  LabeledProgress(
+                  ELabeledProgress(
                     value: frac('mastered', sentences == 0 ? 1 : sentences),
                     label: 'Sentences ($sentences)',
                   ),
@@ -88,17 +124,17 @@ class ProgressScreen extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ESpacing.md),
           Wrap(
-            spacing: 16,
-            runSpacing: 8,
+            spacing: 20,
+            runSpacing: 10,
             children: [
-              _stat('Total words', '$vocab'),
-              _stat('Total sentences', '$sentences'),
-              _stat('Completed lessons', '$mastered mastered items'),
-              _stat('Correct answers', '$correct'),
-              _stat('Incorrect answers', '$wrong'),
-              _stat('Accuracy', '$accuracy%'),
+              _stat(context, 'Total words', '$vocab'),
+              _stat(context, 'Total sentences', '$sentences'),
+              _stat(context, 'Mastered', '$mastered items'),
+              _stat(context, 'Correct answers', '$correct'),
+              _stat(context, 'Incorrect answers', '$wrong'),
+              _stat(context, 'Accuracy', '$accuracy%'),
             ],
           ),
           FutureBuilder(
@@ -117,62 +153,60 @@ class ProgressScreen extends ConsumerWidget {
     );
   }
 
-  Widget _stat(String label, String value) {
+  Widget _stat(BuildContext context, String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }
 
-  Widget _streakCard(BuildContext context, StreakInfo s) {
-    return SectionCard(
-      child: Row(
-        children: [
-          const Icon(Icons.local_fire_department,
-              color: Colors.orange, size: 36),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Current streak: ${s.current} days',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text('Longest streak: ${s.longest} days'),
-              ],
+  Widget _calendarStatsLinks(BuildContext context) {
+    return Column(
+      children: [
+        ETile(
+          icon: Icons.calendar_month_outlined,
+          title: 'Calendar',
+          subtitle: 'Studied days, streaks, activity',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const CalendarStatsScreen(initialTab: 0),
             ),
           ),
-        ],
-      ),
+        ),
+        ETile(
+          icon: Icons.bar_chart_outlined,
+          title: 'Statistics',
+          subtitle: 'Accuracy, study time, records',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const CalendarStatsScreen(initialTab: 1),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _weakWordsCard(BuildContext context, WidgetRef ref) {
-    return SectionCard(
+    return ESectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Weak Words (review these)',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
+          const ESectionTitle(title: 'Weak Words (review these)'),
+          const SizedBox(height: ESpacing.sm),
           FutureBuilder(
             future: ref.read(repositoryProvider).weakItems(limit: 10),
             builder: (ctx, snap) {
               final list = snap.data ?? [];
               if (list.isEmpty) {
-                return const Text(
-                  'No weak words yet — keep learning!',
-                );
+                return const Text('No weak words yet — keep learning!');
               }
               return Column(
                 children: [
@@ -184,6 +218,7 @@ class ProgressScreen extends ConsumerWidget {
                       subtitle: Text(item.targetText),
                       trailing: Text(
                         '${p.wrongCount} wrong / ${p.correctCount} right',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                 ],
@@ -195,3 +230,6 @@ class ProgressScreen extends ConsumerWidget {
     );
   }
 }
+
+/// Days-since helper reused by calendar intensity.
+int daysSinceLocal(DateTime from) => daysSince(from);

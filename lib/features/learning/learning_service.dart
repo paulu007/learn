@@ -35,9 +35,10 @@ class ClassHint {
       text = switch (level) {
         1 => item.tags.isEmpty ? 'No category set.' : item.tags,
         2 => item.example.isEmpty ? 'No example available.' : item.example,
-        3 => item.targetText.trim().isEmpty
-            ? 'No answer available.'
-            : 'Starts with "${String.fromCharCode(item.targetText.trim().runes.first)}".',
+        3 =>
+          item.targetText.trim().isEmpty
+              ? 'No answer available.'
+              : 'Starts with "${String.fromCharCode(item.targetText.trim().runes.first)}".',
         _ => item.targetText,
       };
 }
@@ -66,7 +67,8 @@ class LearningService {
   }
 
   ExerciseKind _pickKind(LearningItem item) {
-    if (item.isSentence && item.sourceText.trim().split(RegExp(r'\s+')).length >= 3) {
+    if (item.isSentence &&
+        item.sourceText.trim().split(RegExp(r'\s+')).length >= 3) {
       final options = [
         ExerciseKind.multipleChoice,
         ExerciseKind.typing,
@@ -87,11 +89,7 @@ class LearningService {
       case ExerciseKind.flashcard:
         return Exercise(kind: kind, item: item);
       case ExerciseKind.multipleChoice:
-        return Exercise(
-          kind: kind,
-          item: item,
-          choices: _choices(item, pool),
-        );
+        return Exercise(kind: kind, item: item, choices: _choices(item, pool));
       case ExerciseKind.typing:
         return Exercise(kind: kind, item: item);
       case ExerciseKind.sentenceBuilder:
@@ -102,12 +100,13 @@ class LearningService {
   }
 
   List<String> _choices(LearningItem item, List<LearningItem> pool) {
-    final others = pool
-        .where((e) => e.id != item.id && e.targetText != item.targetText)
-        .map((e) => e.targetText)
-        .toSet()
-        .toList()
-      ..shuffle(_random);
+    final others =
+        pool
+            .where((e) => e.id != item.id && e.targetText != item.targetText)
+            .map((e) => e.targetText)
+            .toSet()
+            .toList()
+          ..shuffle(_random);
     final picks = others.take(3).toList();
     while (picks.length < 3) {
       picks.add('(no other option)');

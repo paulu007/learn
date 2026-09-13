@@ -363,8 +363,7 @@ class UserSettings {
     themeMode: m['theme_mode'] ?? 'system',
     fontSize: m['font_size'] ?? 'normal',
     dailyGoal:
-        int.tryParse(m['daily_goal'] ?? '') ??
-        AppConstants.defaultDailyGoal,
+        int.tryParse(m['daily_goal'] ?? '') ?? AppConstants.defaultDailyGoal,
     lastCourseId: m['last_course_id'],
     lastLessonId: m['last_lesson_id'],
   );

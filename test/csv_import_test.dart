@@ -37,8 +37,7 @@ void main() {
     });
 
     test('accepts header aliases', () {
-      const csv =
-          'Source Text,Translation,Lesson\nhello,سلام,Basics';
+      const csv = 'Source Text,Translation,Lesson\nhello,سلام,Basics';
       final preview = service.parseCsv(csv);
       expect(preview.globalErrors, isEmpty);
       expect(preview.validRows.length, 1);
@@ -66,7 +65,10 @@ void main() {
 
   group('LearningService.checkAnswer', () {
     test('ignores case and whitespace', () {
-      expect(LearningService.checkAnswer('I need water', '  i NEED  water '), isTrue);
+      expect(
+        LearningService.checkAnswer('I need water', '  i NEED  water '),
+        isTrue,
+      );
       expect(LearningService.checkAnswer('book', 'table'), isFalse);
     });
   });

@@ -25,7 +25,9 @@ class AppRepository {
   Future<UserSettings> loadSettings() async {
     final db = await _db;
     final rows = await db.query('settings');
-    final map = {for (final r in rows) r['key'] as String: r['value'] as String?};
+    final map = {
+      for (final r in rows) r['key'] as String: r['value'] as String?,
+    };
     return UserSettings.fromMap(map);
   }
 
@@ -51,11 +53,7 @@ class AppRepository {
 
   Future<Course?> courseById(String id) async {
     final db = await _db;
-    final rows = await db.query(
-      'courses',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final rows = await db.query('courses', where: 'id = ?', whereArgs: [id]);
     return rows.isEmpty ? null : Course.fromMap(rows.first);
   }
 
@@ -117,11 +115,7 @@ class AppRepository {
 
   Future<Lesson?> lessonById(String id) async {
     final db = await _db;
-    final rows = await db.query(
-      'lessons',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final rows = await db.query('lessons', where: 'id = ?', whereArgs: [id]);
     return rows.isEmpty ? null : Lesson.fromMap(rows.first);
   }
 
@@ -198,11 +192,7 @@ class AppRepository {
     );
     final batch = db.batch();
     for (final it in items) {
-      batch.delete(
-        'progress',
-        where: 'item_id = ?',
-        whereArgs: [it['id']],
-      );
+      batch.delete('progress', where: 'item_id = ?', whereArgs: [it['id']]);
     }
     await batch.commit(noResult: true);
   }
@@ -222,11 +212,7 @@ class AppRepository {
       whereArgs: [lessonId],
     );
     for (final it in items) {
-      await db.delete(
-        'progress',
-        where: 'item_id = ?',
-        whereArgs: [it['id']],
-      );
+      await db.delete('progress', where: 'item_id = ?', whereArgs: [it['id']]);
     }
     await db.delete(
       'learning_items',
@@ -268,7 +254,9 @@ class AppRepository {
       'SELECT type, COUNT(*) AS c FROM learning_items WHERE lesson_id = ? GROUP BY type',
       [lessonId],
     );
-    return {for (final r in rows) (r['type'] as String): ((r['c'] as num)).toInt()};
+    return {
+      for (final r in rows) (r['type'] as String): ((r['c'] as num)).toInt(),
+    };
   }
 
   /// Items due for review: never reviewed, or next_review reached.
@@ -288,6 +276,37 @@ class AppRepository {
     return rows.map(LearningItem.fromMap).toList();
   }
 
+  /// Total items due for review across all lessons (Home + Practice).
+  Future<int> dueCount() async {
+    final db = await _db;
+    final rows = await db.rawQuery(
+      '''
+      SELECT COUNT(*) AS c FROM learning_items li
+      LEFT JOIN progress pr ON pr.item_id = li.id
+      WHERE pr.item_id IS NULL OR pr.next_review IS NULL OR pr.next_review <= ?
+      ''',
+      [nowMs()],
+    );
+    return ((rows.first['c'] as num?) ?? 0).toInt();
+  }
+
+  /// Due-review counts per lesson; only lessons with due items are included.
+  Future<Map<String, int>> dueCountsByLesson() async {
+    final db = await _db;
+    final rows = await db.rawQuery(
+      '''
+      SELECT li.lesson_id AS id, COUNT(*) AS c FROM learning_items li
+      LEFT JOIN progress pr ON pr.item_id = li.id
+      WHERE pr.item_id IS NULL OR pr.next_review IS NULL OR pr.next_review <= ?
+      GROUP BY li.lesson_id
+      ''',
+      [nowMs()],
+    );
+    return {
+      for (final r in rows) (r['id'] as String): ((r['c'] as num)).toInt(),
+    };
+  }
+
   // ---------- Progress ----------
 
   Future<Map<String, ItemProgress>> progressForItems(
@@ -301,7 +320,9 @@ class AppRepository {
       where: 'item_id IN ($placeholders)',
       whereArgs: itemIds,
     );
-    return {for (final r in rows) (r['item_id'] as String): ItemProgress.fromMap(r)};
+    return {
+      for (final r in rows) (r['item_id'] as String): ItemProgress.fromMap(r),
+    };
   }
 
   Future<ItemProgress> getProgress(String itemId) async {
@@ -326,10 +347,7 @@ class AppRepository {
       updated.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    await recordActivity(
-      word: item.isVocab,
-      sentence: !item.isVocab,
-    );
+    await recordActivity(word: item.isVocab, sentence: !item.isVocab);
     return updated;
   }
 
@@ -344,7 +362,9 @@ class AppRepository {
       ''',
       [lessonId],
     );
-    return {for (final r in rows) (r['s'] as String): ((r['c'] as num)).toInt()};
+    return {
+      for (final r in rows) (r['s'] as String): ((r['c'] as num)).toInt(),
+    };
   }
 
   // ---------- Daily activity + streak ----------
@@ -435,11 +455,7 @@ class AppRepository {
     } else {
       effective = 0;
     }
-    return StreakInfo(
-      current: effective,
-      longest: longest,
-      lastStudyDay: last,
-    );
+    return StreakInfo(current: effective, longest: longest, lastStudyDay: last);
   }
 
   Future<String?> _get(DatabaseExecutor db, String key) async {
@@ -453,8 +469,10 @@ class AppRepository {
   }
 
   Future<void> _set(DatabaseExecutor db, String key, String value) async {
-    await db.insert('settings', {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('settings', {
+      'key': key,
+      'value': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // ---------- Game results ----------
@@ -494,11 +512,7 @@ class AppRepository {
 
   Future<List<Map<String, Object?>>> gameHistory({int limit = 50}) async {
     final db = await _db;
-    return db.query(
-      'game_results',
-      orderBy: 'played_at DESC',
-      limit: limit,
-    );
+    return db.query('game_results', orderBy: 'played_at DESC', limit: limit);
   }
 
   // ---------- Statistics ----------
@@ -518,14 +532,14 @@ class AppRepository {
   /// Overall progress-status counts across all items.
   Future<Map<String, int>> overallStatusCounts() async {
     final db = await _db;
-    final rows = await db.rawQuery(
-      '''
+    final rows = await db.rawQuery('''
       SELECT COALESCE(pr.status, 'new') AS s, COUNT(*) AS c
       FROM learning_items li LEFT JOIN progress pr ON pr.item_id = li.id
       GROUP BY s
-      ''',
-    );
-    return {for (final r in rows) (r['s'] as String): ((r['c'] as num)).toInt()};
+      ''');
+    return {
+      for (final r in rows) (r['s'] as String): ((r['c'] as num)).toInt(),
+    };
   }
 
   /// Total study seconds logged across all days.
@@ -567,9 +581,7 @@ class AppRepository {
   // ---------- Weak items / maintenance ----------
 
   /// Items where mistakes outnumber correct answers (for the Progress screen).
-  Future<List<(LearningItem, ItemProgress)>> weakItems({
-    int limit = 10,
-  }) async {
+  Future<List<(LearningItem, ItemProgress)>> weakItems({int limit = 10}) async {
     final db = await _db;
     final rows = await db.rawQuery(
       '''
@@ -627,9 +639,7 @@ class AppRepository {
   Future<String> writeBackup() async {
     final data = await exportAll();
     final dir = await getApplicationDocumentsDirectory();
-    final file = File(
-      p.join(dir.path, 'e_backup_${dayKey()}_${nowMs()}.json'),
-    );
+    final file = File(p.join(dir.path, 'e_backup_${dayKey()}_${nowMs()}.json'));
     await file.writeAsString(jsonEncode(data));
     return file.path;
   }

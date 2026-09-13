@@ -132,11 +132,22 @@ void refreshAfterStudy(WidgetRef ref) {
   ref.invalidate(streakProvider);
   ref.invalidate(totalsProvider);
   ref.invalidate(coursesProvider);
+  ref.invalidate(dueCountProvider);
+  ref.invalidate(dueCountsByLessonProvider);
 }
 
+/// Total due-review items across all lessons (Home hero + Practice tab).
+final dueCountProvider = FutureProvider<int>((ref) async {
+  return ref.watch(repositoryProvider).dueCount();
+});
+
+/// Per-lesson due-review counts (Practice tab grouping).
+final dueCountsByLessonProvider = FutureProvider<Map<String, int>>((ref) async {
+  return ref.watch(repositoryProvider).dueCountsByLesson();
+});
+
 /// Text scaler applied at the app root from settings.
-double fontScaleOf(UserSettings s) =>
-    AppFontSize.fromName(s.fontSize).scale;
+double fontScaleOf(UserSettings s) => AppFontSize.fromName(s.fontSize).scale;
 
 /// Light/dark ThemeData pair built from the current font size.
 ({ThemeData light, ThemeData dark}) themesOf(UserSettings s) {

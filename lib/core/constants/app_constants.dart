@@ -30,7 +30,8 @@ class AppConstants {
   ];
 
   /// Shown on the import screen so users know exactly how to prepare a file.
-  static const String csvExample = '''type,source,target,example,hint,lesson,tags,difficulty
+  static const String csvExample =
+      '''type,source,target,example,hint,lesson,tags,difficulty
 vocab,hello,سلام,Hello John!,A greeting,1,greeting,easy
 vocab,book,کتاب,I read a book.,Something you read,1,objects,easy
 vocab,water,آب,I drink water.,A common drink,1,food,easy

@@ -1,25 +1,30 @@
 name: Build
 
-# Builds the E app and attaches one installable file per OS to every
-# successful run on main/master (continuous Release):
+# E release pipeline (spec §65–§69).
 #
-#   Android -> e-android-v<run>.apk   (universal release APK, Android 8.0+)
-#   Linux   -> e-linux-v<run>.deb     (Debian package: /usr/bin/e)
-#   Windows -> e-windows-setup-v<run>.exe (Inno Setup installer)
+#   Pull request -> format check + analyze + unit/widget tests.
+#                   Builds run too (artifacts only, never released).
+#   Tag v* (v1.0.0) -> everything above, then release builds whose
+#                   artifacts are published to the GitHub Release:
+#                     E-<version>-android.apk
+#                     E-<version>-windows.zip
+#                     E-<version>-linux.deb
+#                     E-<version>-linux.rpm
+#   workflow_dispatch -> manual run from the Actions tab.
 #
-# Triggers:
-#   - push to main/master  -> analyze + builds + continuous Release
-#   - pull_request          -> analyze + builds (binaries as artifacts only,
-#                             NOT attached to the Release)
-#   - tag v* (e.g. v1.0.0)  -> analyze + builds + a versioned GitHub Release
-#                             with the same three files
-#   - workflow_dispatch     -> manual run from the Actions tab
+# Quality gates (spec §67): the release job only runs when format,
+# analyze, tests, AND all platform builds succeed, and it verifies
+# every artifact exists before publishing. A broken build can never
+# become a Release.
+#
+# Versioning (spec §69): the single source of truth is APP_VERSION
+# below, kept in sync with AppInfo.version in
+# lib/core/constants/app_info.dart and pubspec.yaml.
 
 on:
-  push:
-    branches: [main, master]
-    tags: ["v*"]
   pull_request:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -35,8 +40,9 @@ env:
 
 jobs:
   # ------------------------------------------------------------------
-  analyze:
-    name: Analyze & test
+  # PR gate: format + analyze + tests (spec §66, §67).
+  check:
+    name: Format, analyze & test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,13 +54,14 @@ jobs:
           cache: true
 
       - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
 
   # ------------------------------------------------------------------
   android:
     name: Android APK
-    needs: analyze
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,29 +84,23 @@ jobs:
       # minSdk 26 (Android 8.0+) is set in android/app/build.gradle.kts.
       # Release is signed with debug keys (see build.gradle.kts) so it
       # installs for testing; add real signing before Play Store upload.
-      # --split-per-abi keeps each APK small; the Release takes the arm64
-      # build, which covers the vast majority of devices.
-      - run: flutter build apk --release --split-per-abi
-      - run: flutter build apk --debug
+      - run: flutter build apk --release
 
-      - name: Rename APKs
-        run: |
-          mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
-             e-android-v${{ github.run_number }}.apk
-          mv build/app/outputs/flutter-apk/app-debug.apk \
-             e-android-debug-v${{ github.run_number }}.apk
+      - name: Rename to spec §68 artifact name
+        run: >
+          mv build/app/outputs/flutter-apk/app-release.apk
+          E-${{ env.APP_VERSION }}-android.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: e-android
+          name: E-android-apk
           retention-days: 14
-          path: |
-            e-android-v*.apk
+          path: E-*-android.apk
 
   # ------------------------------------------------------------------
   linux:
-    name: Linux .deb
-    needs: analyze
+    name: Linux DEB + RPM
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -108,7 +109,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake git ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev libstdc++-12-dev dpkg-dev
+            libgtk-3-dev liblzma-dev libstdc++-12-dev dpkg-dev rpm
 
       - uses: subosito/flutter-action@v2
         with:
@@ -122,7 +123,7 @@ jobs:
 
       - name: Assemble .deb
         run: |
-          VER="${{ env.APP_VERSION }}+${{ github.run_number }}"
+          VER="${{ env.APP_VERSION }}"
           PKGDIR="pkgdeb/e_${VER}_amd64"
           mkdir -p "$PKGDIR/DEBIAN" "$PKGDIR/usr/bin" "$PKGDIR/usr/share/applications"
           cp build/linux/x64/release/bundle/e "$PKGDIR/usr/bin/e"
@@ -140,19 +141,35 @@ jobs:
           Description: E - offline language learning
            Your language, your lessons, your pace.
           EOF
-          dpkg-deb --build "$PKGDIR"
-          mv "pkgdeb/e_${VER}_amd64.deb" "e-linux-v${{ github.run_number }}.deb"
+          dpkg-deb --build "$PKGDIR" "E-${VER}-linux.deb"
+
+      - name: Assemble .rpm
+        run: |
+          VER="${{ env.APP_VERSION }}"
+          STAGE="pkgrpm/stage"
+          mkdir -p "$STAGE/bundle"
+          cp -r build/linux/x64/release/bundle/* "$STAGE/bundle/"
+          cp packaging/linux/e.desktop "$STAGE/e.desktop"
+          rpmbuild -bb packaging/linux/rpm/e.spec \
+            --define "_version $VER" \
+            --define "_build 1" \
+            --define "_sourcedir $PWD/$STAGE" \
+            --define "_rpmdir $PWD/pkgrpm" \
+            --define "_builddir $PWD/pkgrpm/build"
+          mv pkgrpm/x86_64/e-*.rpm "E-${VER}-linux.rpm"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: e-linux
+          name: E-linux-packages
           retention-days: 14
-          path: e-linux-v*.deb
+          path: |
+            E-*-linux.deb
+            E-*-linux.rpm
 
   # ------------------------------------------------------------------
   windows:
-    name: Windows setup.exe
-    needs: analyze
+    name: Windows package
+    needs: check
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -179,22 +196,59 @@ jobs:
         run: |
           choco install innosetup --no-progress -y
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc /DMyAppVersion="${{ env.APP_VERSION }}+${{ github.run_number }}" packaging\windows\installer.iss
-          Move-Item installer-output\e-windows-setup.exe e-windows-setup-v${{ github.run_number }}.exe
+          & $iscc /DMyAppVersion="${{ env.APP_VERSION }}" packaging\windows\installer.iss
+
+      - name: Zip portable folder + installer
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* `
+            -DestinationPath E-${{ env.APP_VERSION }}-windows.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: e-windows
+          name: E-windows-package
           retention-days: 14
-          path: e-windows-setup-v*.exe
+          path: |
+            E-*-windows.zip
+            installer-output/e-windows-setup.exe
 
   # ------------------------------------------------------------------
+  # macOS is parked (spec §64–§65 list it as a goal): it needs a
+  # macos/ runner folder (`flutter create --platforms=macos` on a Mac)
+  # and Apple signing for distribution. Uncomment when ready:
+  #
+  # macos:
+  #   name: macOS package
+  #   needs: check
+  #   runs-on: macos-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: subosito/flutter-action@v2
+  #       with:
+  #         flutter-version: ${{ env.FLUTTER_VERSION }}
+  #         channel: stable
+  #         cache: true
+  #     - run: flutter pub get
+  #     - run: flutter config --enable-macos-desktop
+  #     - run: flutter build macos --release
+  #     - run: |
+  #         ditto -c -k --sequesterRsrc --keepParent \
+  #           build/macos/Build/Products/Release/e.app \
+  #           E-${{ env.APP_VERSION }}-macos.zip
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: E-macos-package
+  #         retention-days: 14
+  #         path: E-*-macos.zip
+
+  # ------------------------------------------------------------------
+  # Tag-only release (spec §66–§68). Runs only when format, tests,
+  # and ALL platform builds passed; fails loudly if any artifact
+  # is missing (spec §67) instead of publishing a partial Release.
   release:
-    name: Attach binaries to Release
-    needs: [analyze, android, linux, windows]
-    # Pushes to main/master update the rolling "continuous" Release.
-    # Tags (v*) create a versioned Release instead.
-    if: github.event_name != 'pull_request'
+    name: GitHub Release
+    needs: [check, android, linux, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -202,28 +256,26 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
+          merge-multiple: true
 
-      - name: Versioned tag release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+      - name: Verify all required artifacts exist
+        run: |
+          ls -la
+          test -f E-${{ env.APP_VERSION }}-android.apk || \
+            (echo "::error::missing Android APK" && exit 1)
+          test -f E-${{ env.APP_VERSION }}-windows.zip || \
+            (echo "::error::missing Windows zip" && exit 1)
+          test -f E-${{ env.APP_VERSION }}-linux.deb || \
+            (echo "::error::missing Linux .deb" && exit 1)
+          test -f E-${{ env.APP_VERSION }}-linux.rpm || \
+            (echo "::error::missing Linux .rpm" && exit 1)
+
+      - uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/e-android/*.apk
-            dist/e-linux/*.deb
-            dist/e-windows/*.exe
+            E-${{ env.APP_VERSION }}-android.apk
+            E-${{ env.APP_VERSION }}-windows.zip
+            E-${{ env.APP_VERSION }}-linux.deb
+            E-${{ env.APP_VERSION }}-linux.rpm
+            installer-output/e-windows-setup.exe
           generate_release_notes: true
-
-      - name: Continuous main-branch release
-        if: "!startsWith(github.ref, 'refs/tags/v')"
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: continuous
-          name: "Continuous build (main)"
-          prerelease: true
-          files: |
-            dist/e-android/*.apk
-            dist/e-linux/*.deb
-            dist/e-windows/*.exe
-          body: |
-            Latest successful build of the default branch.
-            Commit: ${{ github.sha }}

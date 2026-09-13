@@ -42,7 +42,10 @@ class _LessonSessionScreenState extends ConsumerState<LessonSessionScreen> {
     final progress = await repo.progressForItems(
       pool.map((e) => e.id).toList(),
     );
-    final queue = LearningService().buildQueue(pool.take(20).toList(), progress);
+    final queue = LearningService().buildQueue(
+      pool.take(20).toList(),
+      progress,
+    );
     setState(() => _queue = queue);
   }
 
@@ -97,7 +100,8 @@ class _LessonSessionScreenState extends ConsumerState<LessonSessionScreen> {
             return const EmptyState(
               icon: Icons.celebration_outlined,
               title: 'Nothing due right now',
-              message: 'All items in this lesson are reviewed. Come back later!',
+              message:
+                  'All items in this lesson are reviewed. Come back later!',
             );
           }
           if (_index >= queue.length) {
@@ -140,13 +144,16 @@ class _LessonSessionScreenState extends ConsumerState<LessonSessionScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.emoji_events_outlined, size: 72, color: Colors.amber),
+            const Icon(
+              Icons.emoji_events_outlined,
+              size: 72,
+              color: Colors.amber,
+            ),
             const SizedBox(height: 16),
             Text(
               'Session Complete',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             FeedbackBanner(correct: pct >= 60),
@@ -239,9 +246,8 @@ class _FlashcardViewState extends State<_FlashcardView> {
             children: [
               Text(
                 widget.item.sourceText,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(context).textTheme.headlineMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -351,17 +357,14 @@ class _MultipleChoiceViewState extends State<_MultipleChoiceView> {
               const SizedBox(height: 8),
               Text(
                 item.sourceText,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(context).textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
         ),
         if (_picked != null) ...[
-          FeedbackBanner(
-            correct: _picked == item.targetText,
-          ),
+          FeedbackBanner(correct: _picked == item.targetText),
           const SizedBox(height: 8),
         ],
         for (final choice in widget.exercise.choices)
@@ -374,17 +377,11 @@ class _MultipleChoiceViewState extends State<_MultipleChoiceView> {
                     ? null
                     : choice == item.targetText
                     ? OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Colors.green,
-                          width: 2,
-                        ),
+                        side: const BorderSide(color: Colors.green, width: 2),
                       )
                     : choice == _picked
                     ? OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Colors.red,
-                          width: 2,
-                        ),
+                        side: const BorderSide(color: Colors.red, width: 2),
                       )
                     : null,
                 onPressed: _picked == null
@@ -439,16 +436,12 @@ class _TypingViewState extends State<_TypingView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Translate:',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text('Translate:', style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 8),
               Text(
                 widget.item.targetText,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(context).textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               const Text('Type the word in the source language:'),
@@ -573,9 +566,8 @@ class _SentenceBuilderViewState extends State<_SentenceBuilderView> {
               const SizedBox(height: 8),
               Text(
                 item.targetText,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -617,9 +609,8 @@ class _SentenceBuilderViewState extends State<_SentenceBuilderView> {
               for (final e in remaining)
                 ActionChip(
                   label: Text(e.value),
-                  onPressed: () => setState(
-                    () => _picked.add('${e.key}:${e.value}'),
-                  ),
+                  onPressed: () =>
+                      setState(() => _picked.add('${e.key}:${e.value}')),
                 ),
             ],
           ),
