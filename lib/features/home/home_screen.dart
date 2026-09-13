@@ -13,8 +13,9 @@ import '../learn/learn_screen.dart';
 import '../learning/lesson_session_screen.dart';
 import '../practice/practice_screen.dart';
 
-/// Home (spec §8, §58, §59): answers "What should I do now?"
-/// Greeting → streak → daily goal → continue → review → quick actions.
+/// Home (mockup Screen 3 + spec §8, §58, §59): greeting + sun-yellow
+/// streak pill → Today's Progress hero card with ring → Continue
+/// Learning (dark navy) → Current Course → Review list.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -29,9 +30,10 @@ class HomeScreen extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           children: [
             _greeting(context, ref),
-            _continueHero(context, ref, s),
-            _reviewHero(context, ref),
-            _todayRow(context, ref, s.dailyGoal),
+            _todayHero(context, ref, s.dailyGoal),
+            _continueDark(context, ref, s),
+            _courseCard(context, ref, s),
+            _reviewList(context, ref),
             _quickActions(context),
           ],
         ),
@@ -42,28 +44,16 @@ class HomeScreen extends ConsumerWidget {
   Widget _greeting(BuildContext context, WidgetRef ref) {
     final streak = ref.watch(streakProvider);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${dayGreeting()} 👋',
-                  style: Theme.of(context).textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'What should you do now? Start below.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+          Text(
+            '${dayGreeting()} 👋',
+            style: Theme.of(context).textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w800),
           ),
+          const SizedBox(height: ESpacing.sm),
           streak.maybeWhen(
             data: (st) => EStreakPill(days: st.current),
             orElse: () => const SizedBox.shrink(),
@@ -73,118 +63,197 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  /// Smart Continue (spec §58): review due first, else current lesson.
-  Widget _continueHero(BuildContext context, WidgetRef ref, UserSettings s) {
-    final due = ref.watch(dueCountProvider);
-    final courses = ref.watch(coursesProvider);
-    return due.when(
+  /// Mockup "Today's Progress" hero: 75%-style ring on the right,
+  /// "15 / 20 activities" caption, full-width blue Continue CTA.
+  Widget _todayHero(BuildContext context, WidgetRef ref, int goal) {
+    final activity = ref.watch(todayActivityProvider);
+    return activity.when(
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
-      data: (dueCount) {
-        if (dueCount > 0) {
-          return EHeroCard(
+      data: (act) {
+        final done = act.activities.clamp(0, goal);
+        final frac = goal == 0 ? 0.0 : done / goal;
+        return EHeroCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Today's Progress",
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$done / $goal activities',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        if (act.goalCompleted)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Completed ✓ — streak updated.',
+                              style: TextStyle(
+                                color: EColors.leaf,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  EProgressRing(value: frac, done: done, goal: goal, size: 92),
+                ],
+              ),
+              const SizedBox(height: ESpacing.lg),
+              EPrimaryButton(
+                label: 'Continue Learning',
+                icon: Icons.play_arrow,
+                onPressed: () => _openContinue(context, ref),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Smart Continue target (spec §58): most-due review lesson, else the
+  /// current lesson, else Learn.
+  Future<void> _openContinue(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(repositoryProvider);
+    final byLesson = await repo.dueCountsByLesson();
+    if (byLesson.isNotEmpty) {
+      final top = byLesson.entries.reduce((a, b) => a.value >= b.value ? a : b);
+      if (context.mounted) LearnLessonLauncher.open(context, top.key);
+      return;
+    }
+    final settings = await ref.read(settingsProvider.future);
+    final courses = await repo.courses();
+    if (courses.isEmpty) {
+      if (context.mounted) {
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const LearnScreen()));
+      }
+      return;
+    }
+    final info = await _currentLesson(ref, courses, settings);
+    if (!context.mounted) return;
+    if (info.lessonId.isEmpty) {
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const LearnScreen()));
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LessonSessionScreen(lessonId: info.lessonId),
+        ),
+      );
+    }
+  }
+
+  /// Mockup dark-navy "Continue Learning" card: lesson eyebrow, big
+  /// title, meta line, full-width sky-blue action.
+  Widget _continueDark(BuildContext context, WidgetRef ref, UserSettings s) {
+    final courses = ref.watch(coursesProvider);
+    return courses.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (all) {
+        if (all.isEmpty) {
+          return EDarkCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Continue Learning',
-                  style: Theme.of(context).textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                const Text(
+                  'Welcome to E!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Review $dueCount word${dueCount == 1 ? '' : 's'} · ~5 minutes',
-                  style: Theme.of(context).textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  'Import your first lesson to start learning.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: ESpacing.lg),
                 EPrimaryButton(
-                  label: 'Start',
-                  icon: Icons.play_arrow,
+                  label: 'Import Lesson',
+                  icon: Icons.upload_file,
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PracticeScreen()),
+                    MaterialPageRoute(builder: (_) => const ImportScreen()),
                   ),
                 ),
               ],
             ),
           );
         }
-        return courses.when(
-          loading: () => const SizedBox.shrink(),
-          error: (_, _) => const SizedBox.shrink(),
-          data: (all) {
-            if (all.isEmpty) {
-              return EHeroCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome to E!',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Import your first lesson to start learning. Your language, your lessons, your pace.',
-                    ),
-                    const SizedBox(height: 12),
-                    EPrimaryButton(
-                      label: 'Import Lesson',
-                      icon: Icons.upload_file,
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ImportScreen()),
-                      ),
-                    ),
-                  ],
+        return FutureBuilder(
+          future: _currentLesson(ref, all, s),
+          builder: (ctx, snap) {
+            if (!snap.hasData) return const SizedBox.shrink();
+            final info = snap.data!;
+            if (info.lessonId.isEmpty) return const SizedBox.shrink();
+            return EDarkCard(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => LessonDetailScreen(lessonId: info.lessonId),
                 ),
-              );
-            }
-            return FutureBuilder(
-              future: _currentLesson(ref, all, s),
-              builder: (ctx, snap) {
-                if (!snap.hasData) return const SizedBox.shrink();
-                final info = snap.data!;
-                if (info.lessonId.isEmpty) return const SizedBox.shrink();
-                return EHeroCard(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          LessonDetailScreen(lessonId: info.lessonId),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Continue Learning'.toUpperCase(),
+                    style: TextStyle(
+                      color: EColors.sun,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Continue Learning',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        info.courseTitle,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      Text(
-                        '${info.lessonTitle} · ${info.words} words · ${info.sentences} sentences',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      EPrimaryButton(
-                        label: 'Continue',
-                        icon: Icons.play_arrow,
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                LessonSessionScreen(lessonId: info.lessonId),
-                          ),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 6),
+                  Text(
+                    info.lessonTitle,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                );
-              },
+                  const SizedBox(height: 4),
+                  Text(
+                    '${info.courseTitle} · ${info.words} words · ${info.sentences} sentences',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: ESpacing.lg),
+                  EPrimaryButton(
+                    label: 'Continue',
+                    icon: Icons.play_arrow,
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            LessonSessionScreen(lessonId: info.lessonId),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -192,97 +261,135 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  /// Daily review nudge (spec §35) — hidden when the Continue hero already
-  /// covers review, shown when there is a current lesson AND due items.
-  Widget _reviewHero(BuildContext context, WidgetRef ref) {
-    final due = ref.watch(dueCountProvider);
-    return due.maybeWhen(
-      data: (count) {
-        if (count == 0) return const SizedBox.shrink();
-        return ESectionCard(
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: EColors.xp.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(ERadii.lg),
+  /// Mockup "Current Course" card: label, pair title, lesson + counts,
+  /// tappable through to the lesson.
+  Widget _courseCard(BuildContext context, WidgetRef ref, UserSettings s) {
+    final courses = ref.watch(coursesProvider);
+    return courses.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (all) {
+        if (all.isEmpty) return const SizedBox.shrink();
+        return FutureBuilder(
+          future: _currentLesson(ref, all, s),
+          builder: (ctx, snap) {
+            if (!snap.hasData) return const SizedBox.shrink();
+            final info = snap.data!;
+            if (info.lessonId.isEmpty) return const SizedBox.shrink();
+            return EHeroCard(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => LessonDetailScreen(lessonId: info.lessonId),
                 ),
-                child: const Icon(Icons.history, color: EColors.xp, size: 26),
               ),
-              const SizedBox(width: ESpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$count ready for review',
-                      style: Theme.of(context).textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Current Course'.toUpperCase(),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    Text(
-                      "Let's make them stronger.",
-                      style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    info.courseTitle,
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${info.lessonTitle} · ${info.words} words · ${info.sentences} sentences',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const PracticeScreen()),
-                ),
-                child: const Text('Review'),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
-      orElse: () => const SizedBox.shrink(),
     );
   }
 
-  Widget _todayRow(BuildContext context, WidgetRef ref, int goal) {
-    final activity = ref.watch(todayActivityProvider);
-    return activity.when(
+  /// Mockup "Review" list: header + first due words with translations,
+  /// footer Review Now CTA opening Practice.
+  Widget _reviewList(BuildContext context, WidgetRef ref) {
+    final due = ref.watch(dueCountProvider);
+    return due.when(
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
-      data: (act) {
-        final done = act.activities.clamp(0, goal);
-        return ESectionCard(
-          onTap: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const PracticeScreen())),
-          child: Row(
-            children: [
-              EProgressRing(
-                value: goal == 0 ? 0 : done / goal,
-                done: done,
-                goal: goal,
-              ),
-              const SizedBox(width: ESpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Today's goal",
+      data: (count) {
+        if (count == 0) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Review',
                       style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
-                    Text(
-                      act.goalCompleted
-                          ? 'Completed ✓ — streak updated.'
-                          : '$done of $goal activities done.',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  Text(
+                    '$count ready — make them stronger.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            FutureBuilder(
+              future: _reviewSample(ref, count),
+              builder: (ctx, snap) {
+                final rows = snap.data ?? [];
+                return Column(
+                  children: [
+                    for (final r in rows)
+                      EReviewRow(word: r.$1, translation: r.$2, done: false),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: EPrimaryButton(
+                        label: 'Review Now',
+                        icon: Icons.refresh,
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PracticeScreen(),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-              ),
-            ],
-          ),
+                );
+              },
+            ),
+          ],
         );
       },
     );
+  }
+
+  /// First few due words (source → target) for the mockup review list.
+  Future<List<(String, String)>> _reviewSample(WidgetRef ref, int count) async {
+    final repo = ref.read(repositoryProvider);
+    final byLesson = await repo.dueCountsByLesson();
+    final out = <(String, String)>[];
+    for (final entry in byLesson.entries) {
+      if (out.length >= 3) break;
+      final items = await repo.dueItems(entry.key, limit: 3 - out.length);
+      for (final it in items) {
+        out.add((it.sourceText, it.targetText));
+      }
+    }
+    return out;
   }
 
   Widget _quickActions(BuildContext context) {
@@ -294,7 +401,7 @@ class HomeScreen extends ConsumerWidget {
           child: Text(
             'Quick actions',
             style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+                ?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
         ETile(

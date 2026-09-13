@@ -29,6 +29,15 @@ abstract final class EColors {
   static const xp = Color(0xFF8B5CF6);
   static const success = Color(0xFF16A34A);
   static const danger = Color(0xFFDC2626);
+
+  /// Mockup surfaces: dark navy cards, sun-yellow streak pills,
+  /// leaf-green confirms, sky-blue primary gradient.
+  static const ink = Color(0xFF182032);
+  static const inkSoft = Color(0xFF232D45);
+  static const sun = Color(0xFFFFC531);
+  static const leaf = Color(0xFF22C55E);
+  static const sky = Color(0xFF2F7CF6);
+  static const skySoft = Color(0xFF5B9BFF);
 }
 
 /// Motion durations. All entrance/feedback animation must go through

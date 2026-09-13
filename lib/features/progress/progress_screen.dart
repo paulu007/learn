@@ -39,11 +39,7 @@ class ProgressScreen extends ConsumerWidget {
   }
 
   Widget _streakHero(BuildContext context, StreakInfo s) {
-    return EHeroCard(
-      gradient: [
-        EColors.streak.withValues(alpha: 0.85),
-        const Color(0xFFEA580C),
-      ],
+    return EDarkCard(
       child: Row(
         children: [
           const Icon(

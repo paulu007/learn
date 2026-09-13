@@ -73,7 +73,10 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   Widget _mobile(BuildContext context, int due) {
     return Scaffold(
-      appBar: AppBar(title: Text(_destinations[_index].label)),
+      // Mockup Home has no top bar — the greeting leads directly.
+      appBar: _index == 0
+          ? null
+          : AppBar(title: Text(_destinations[_index].label)),
       body: IndexedStack(
         index: _index,
         children: [for (final d in _destinations) d.screen],

@@ -98,7 +98,8 @@ class ELabeledProgress extends StatelessWidget {
   }
 }
 
-/// E streak pill (spec §31): fire icon + explicit "N day streak" text.
+/// E streak pill (mockup §7: sun-yellow pill with fire icon and
+/// explicit "N Day Streak" text — never color-only, spec §6).
 class EStreakPill extends StatelessWidget {
   final int days;
 
@@ -108,27 +109,30 @@ class EStreakPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: ESpacing.md,
+        horizontal: ESpacing.lg,
         vertical: ESpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: EColors.streak.withValues(alpha: 0.14),
+        color: EColors.sun,
         borderRadius: BorderRadius.circular(ERadii.pill),
+        boxShadow: [
+          BoxShadow(
+            color: EColors.sun.withValues(alpha: 0.45),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.local_fire_department,
-            color: EColors.streak,
-            size: 20,
-          ),
+          const Icon(Icons.local_fire_department, color: EColors.ink, size: 20),
           const SizedBox(width: ESpacing.xs),
           Text(
-            '$days day streak',
+            '$days Day Streak',
             style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: EColors.streak,
+              fontWeight: FontWeight.w800,
+              color: EColors.ink,
             ),
           ),
         ],

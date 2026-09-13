@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// E visual identity (spec §4, §47): friendly, rounded, high-contrast.
-///
-/// Light and dark are each a designed palette — dark is not an inverted
-/// light theme. The brand seed is an original indigo; streak/XP accents
-/// come from the shared [EColors] tokens.
+/// E visual identity (spec §4, §47 + Android reference mockup):
+/// friendly bright-blue primary, very light backgrounds, white cards
+/// with soft shadows. Dark is a designed palette, not inverted light.
 class AppTheme {
-  static const _seed = Color(0xFF4F46E5);
+  static const _seed = Color(0xFF2F7CF6);
   static const _radius = 20.0;
 
   static ThemeData light(double textScale) {
@@ -15,8 +13,8 @@ class AppTheme {
           seedColor: _seed,
           brightness: Brightness.light,
         ).copyWith(
-          primary: const Color(0xFF4338CA),
-          surface: const Color(0xFFF6F7FB),
+          primary: const Color(0xFF2F7CF6),
+          surface: const Color(0xFFF5F7FB),
         );
     return _base(scheme, textScale);
   }
@@ -41,10 +39,10 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
       cardTheme: CardThemeData(
-        elevation: 0,
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_radius),
-          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
@@ -106,6 +104,13 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surface,
         elevation: 0,
+        indicatorColor: scheme.primary,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(color: scheme.onPrimary);
+          }
+          return IconThemeData(color: scheme.onSurfaceVariant);
+        }),
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),

@@ -2,40 +2,71 @@ import 'package:flutter/material.dart';
 
 import '../../core/design/e_design.dart';
 
-/// E hero card (spec §4, §5): soft background, generous radius, subtle
-/// shadow. Use for streak, daily goal, continue-learning — the few cards
-/// that deserve visual weight. Everything else uses [ESectionCard].
+/// E hero card (mockup: white card, radius 20, soft shadow, generous
+/// 20px padding). Use for streak/progress/continue — the few cards that
+/// deserve visual weight. Everything else uses [ESectionCard].
 class EHeroCard extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
-  final List<Color>? gradient;
+  final Color? color;
   final EdgeInsetsGeometry padding;
 
   const EHeroCard({
     super.key,
     required this.child,
     this.onTap,
-    this.gradient,
-    this.padding = const EdgeInsets.all(ESpacing.xxl),
+    this.color,
+    this.padding = const EdgeInsets.all(ESpacing.xl),
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final colors =
-        gradient ?? [scheme.primaryContainer, scheme.secondaryContainer];
     final card = Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: color ?? scheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(ERadii.xl),
         boxShadow: [
           BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(padding: padding, child: child),
+    );
+    if (onTap == null) return card;
+    return _tap(card, onTap!);
+  }
+}
+
+/// E dark card (mockup: deep-navy card with white text, e.g. the streak
+/// banner and the Continue Learning card). Title/body styles adapt; pass
+/// explicit white styles via [child] as needed.
+class EDarkCard extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry padding;
+
+  const EDarkCard({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.padding = const EdgeInsets.all(ESpacing.xl),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final card = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: EColors.ink,
+        borderRadius: BorderRadius.circular(ERadii.xl),
+        boxShadow: [
+          BoxShadow(
+            color: EColors.ink.withValues(alpha: 0.35),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -127,6 +158,89 @@ class ETile extends StatelessWidget {
             ),
           ),
           Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+        ],
+      ),
+    );
+  }
+}
+
+/// E review row (mockup "Review" list): white card with a green check
+/// icon, word, translation, and a trailing status dot.
+class EReviewRow extends StatelessWidget {
+  final String word;
+  final String translation;
+  final bool done;
+
+  const EReviewRow({
+    super.key,
+    required this.word,
+    required this.translation,
+    this.done = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: ESpacing.lg,
+        vertical: ESpacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(ERadii.lg),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: done
+                  ? EColors.leaf.withValues(alpha: 0.15)
+                  : scheme.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              done ? Icons.check : Icons.refresh,
+              size: 20,
+              color: done ? EColors.leaf : scheme.primary,
+            ),
+          ),
+          const SizedBox(width: ESpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  word,
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  translation,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: done ? EColors.leaf : EColors.sun,
+            ),
+          ),
         ],
       ),
     );
