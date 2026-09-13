@@ -1,0 +1,175 @@
+name: Build
+
+# Builds the E app for Android (APK + AAB), Linux (bundle),
+# and Windows (exe) on GitHub-hosted runners.
+#
+# Triggers:
+#   - push to main/master  -> analyze + all three platform builds
+#   - pull_request          -> analyze + all three platform builds
+#   - tag v* (e.g. v1.0.0)  -> everything above + a GitHub Release
+#                             with the binaries attached
+#   - workflow_dispatch     -> manual run from the Actions tab
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.47.3"
+
+jobs:
+  # ------------------------------------------------------------------
+  analyze:
+    name: Analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  # ------------------------------------------------------------------
+  android:
+    name: Android (APK + AAB)
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # Cache Gradle dependencies between runs.
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: flutter pub get
+      # minSdk 26 (Android 8.0+) is set in android/app/build.gradle.kts.
+      # Release is signed with debug keys (see build.gradle.kts) so it
+      # installs for testing; add real signing before Play Store upload.
+      - run: flutter build apk --release
+      - run: flutter build appbundle --release
+      - run: flutter build apk --debug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e-android
+          retention-days: 14
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-debug.apk
+            build/app/outputs/bundle/release/app-release.aab
+
+  # ------------------------------------------------------------------
+  linux:
+    name: Linux (release bundle)
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake git ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter config --enable-linux-desktop
+      - run: flutter build linux --release
+
+      - name: Pack bundle
+        run: tar -czf e-linux-x64.tar.gz -C build/linux/x64/release bundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e-linux
+          retention-days: 14
+          path: e-linux-x64.tar.gz
+
+  # ------------------------------------------------------------------
+  windows:
+    name: Windows (release exe)
+    needs: analyze
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter config --enable-windows-desktop
+
+      # The windows/ runner folder is not committed; generate it if missing.
+      - name: Ensure Windows platform files exist
+        shell: pwsh
+        run: |
+          if (-Not (Test-Path windows)) { flutter create --platforms=windows . }
+
+      - run: flutter build windows --release
+
+      - name: Pack exe
+        shell: pwsh
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath e-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e-windows
+          retention-days: 14
+          path: e-windows-x64.zip
+
+  # ------------------------------------------------------------------
+  release:
+    name: GitHub Release
+    needs: [analyze, android, linux, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/e-android/*.apk
+            dist/e-android/*.aab
+            dist/e-linux/*.tar.gz
+            dist/e-windows/*.zip
+          generate_release_notes: true
